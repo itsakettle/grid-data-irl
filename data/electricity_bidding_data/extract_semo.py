@@ -2,26 +2,13 @@ import boto3
 import requests
 import xml.etree.ElementTree as ET
 from typing import Type, List
-import polars as pl
 from datetime import datetime, timezone
+from collections import namedtuple 
+
+import polars as pl
 
 SEMO_MINIMAL_COST_URL = "https://reports.sem-o.com/documents/PUB_30MinImbalCost_{period}.xml"
 SEMO_PERIOD_FORMAT = "%Y%m%d%H%M"
-
-def create_s3_url(bucket: str, key: str):
-    """
-    Creates S3 path from a bucket and key.
-
-    Args:
-    - bucket (str): S3 bucket
-    - key (str): Key of the file.
-
-    Returns:
-        Returns the path as a string.
-    """
-
-    return f's3://{bucket}/{key}'
-
 
 def read_df(path: str) -> Type[pl.DataFrame]:
     """
@@ -39,12 +26,8 @@ def read_df(path: str) -> Type[pl.DataFrame]:
         df = None
 
     return df
-
-def init_df(periods: List[str], imbalance_prices: List[float]) -> Type[pl.DataFrame]:
-    return pl.DataFrame({"period": periods, "imbalance_price": imbalance_prices})
-
-    
-def period_to_fetch(run_time: datetime):
+   
+def period_to_fetch(run_time_iso: str):
     """
     Figure's out which period to fetch
 
@@ -53,6 +36,7 @@ def period_to_fetch(run_time: datetime):
 
     """
 
+    run_time = datetime.fromisoformat(run_time_iso)
     period = datetime(run_time.year,
         run_time.month,
         run_time.day,
@@ -62,10 +46,6 @@ def period_to_fetch(run_time: datetime):
         tzinfo=timezone.utc)
     
     return period.strftime(SEMO_PERIOD_FORMAT)
-
-
-def put_latest_data_json_from_s3(latest_data: list, bucket: str) -> list:
-    pass
 
 def fetch_semo_xml(period: str):
     """
@@ -82,12 +62,12 @@ def fetch_semo_xml(period: str):
     response = requests.get(semo_url)
 
     if response.status_code != 200:
-        return None
+        raise Exception(f"Semo data unavailable for period: {period}")
 
     return response.text
 
 
-def parse_semo_schema(semo_xml: str):
+def parse_semo_xml(semo_xml: str):
     """
     Fetch semo data for a period.
 
@@ -105,15 +85,29 @@ def parse_semo_schema(semo_xml: str):
                         "imbalance_price": float(imbalance_xml.attrib.get('ImbalancePrice')),
                         "imbalance_cost": float(imbalance_xml.attrib.get('ImbalanceCost'))}
     except:
-        return None
+        raise Exception(f"Unable to parse Semo xml.")
     
     return xml_as_dict
-    
 
-def extract_handler(event, context):
-    get_latest_data_json_from_s3
-    figure_out_dates
-    fill_missing_periods
-    put_latest_data_json_from_s3
+def main(run_time: str, semo_df_path: str):
+    """
+    Runs the main extract_semo job.
 
-    json 
+    Args:
+    - run_time (str): The run time of the job. This determines the period we fetch
+    - semo_df_path (str): THe location where the semo dataframe is saved.
+
+    Returns:
+     A dictionary of attributes from the xml or None if there is an error parsing the xml.
+
+    """
+
+    period = period_to_fetch(run_time_iso=run_time)
+    semo_xml = fetch_semo_xml(period=period)
+    period_semo_df = pl.DataFrame(semo_xml)
+    existing_semo_df = read_df(semo_df_path)
+    new_df = pl.concat([existing_semo_df, period_semo_df])
+    new_df.write_parquet(file=semo_df_path)
+
+if __name__ == "__main__":
+    main()

@@ -41,7 +41,7 @@ def test_parse_semo_schema():
     <PUB_30MinImbalCost ROW="1" StartTime="2023-12-26T11:30:00" EndTime="2023-12-26T12:00:00" ImbalanceVolume="31.987" ImbalancePrice="125.96" ImbalanceCost="4029.08252"/>
     </OutboundData>
     """
-    result = extract_semo.parse_semo_schema(xml)
+    result = extract_semo.parse_semo_xml(xml)
     expected = {"imbalance_volume": 31.987,
                         "imbalance_price": 125.96,
                         "imbalance_cost": 4029.08252}
