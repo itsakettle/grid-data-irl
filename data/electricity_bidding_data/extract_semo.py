@@ -1,80 +1,114 @@
 import boto3
 import requests
-import json
+import xml.etree.ElementTree as ET
+from typing import Type, List
+import polars as pl
 from datetime import datetime, timezone
 
-SEMO_MINIMAL_COST_URL = "https://reports.sem-o.com/documents/PUB_30MinImbalCost_202312251900.xml"
-LOOKBACK_DAYS = 2
+SEMO_MINIMAL_COST_URL = "https://reports.sem-o.com/documents/PUB_30MinImbalCost_{period}.xml"
+SEMO_PERIOD_FORMAT = "%Y%m%d%H%M"
 
-def get_file_from_s3(bucket: str, key: str) -> str:
+def create_s3_url(bucket: str, key: str):
     """
-    Get's a file from S3.
+    Creates S3 path from a bucket and key.
 
     Args:
     - bucket (str): S3 bucket
     - key (str): Key of the file.
 
     Returns:
-        Returns a string with the file contents as a string or none
+        Returns the path as a string.
     """
 
-    s3_client = boto3.client("s3")
+    return f's3://{bucket}/{key}'
+
+
+def read_df(path: str) -> Type[pl.DataFrame]:
+    """
+    Get's a dataframe, handling errors on the way
+
+    Args:
+    - path (str): Path to the df.
+
+    Returns:
+        A polars dataframe or None if it doesn't exist
+    """
     try:
-        response = s3_client.get_object("lastest_data.json")
-        json_string = response['Body'].read().decode('utf-8')
-    except s3_client.Client.exceptions.NoSuchKey as err:
-        return None
+        df = pl.read_parquet(path)
+    except FileNotFoundError:
+        df = None
+
+    return df
+
+def init_df(periods: List[str], imbalance_prices: List[float]) -> Type[pl.DataFrame]:
+    return pl.DataFrame({"period": periods, "imbalance_price": imbalance_prices})
+
     
-    return json_string
-
-def get_latest_data_json_from_s3(bucket: str, key: str) -> dict:
+def period_to_fetch(run_time: datetime):
     """
-    Get's the json data of the last few days
-
-    Args:
-    - bucket (str): S3 bucket
-    - key (str): Key of the file.
+    Figure's out which period to fetch
 
     Returns:
-        Returns a dict of the latest semo json data saved to S3 
-    """
-
-    json_data = get_file_from_s3(bucket, key)
-    if json_data is None:
-        return []
-    else:
-        data = json.loads(json_data)
-        return data
-    
-def periods_to_fetch(latest_data: dict) -> list:
-    """
-    Figure's out which periods to fetch based on the latest_data that has already been fetched.
-
-    Args:
-    - latest_data (dict): Latest data
-
-    Returns:
-        A list of periods to fetch data for.
+        The 30 mnute period to fetch as a string e.g. 202312251900
 
     """
-    current_time = datetime.now(timezone.utc)
-    last_period = datetime(current_time.year,
-        current_time.month,
-        current_time.day,
-        current_time.hour,
-        30 if current_time.minute >= 30 else 0,
+
+    period = datetime(run_time.year,
+        run_time.month,
+        run_time.day,
+        run_time.hour,
+        30 if run_time.minute >= 30 else 0,
         0,
         tzinfo=timezone.utc)
-
-    []
+    
+    return period.strftime(SEMO_PERIOD_FORMAT)
 
 
 def put_latest_data_json_from_s3(latest_data: list, bucket: str) -> list:
     pass
 
-def fetch_semo_data():
-    r = requests.get(SEMO_MINIMAL_COST_URL)
-    print(r.txt)
+def fetch_semo_xml(period: str):
+    """
+    Fetch semo data for a period. This won't be tested.
+
+    Args:
+    - period (str): The start time of the period to fetch .
+
+    Returns:
+     XML as a string or None if there is an error
+
+    """
+    semo_url = SEMO_MINIMAL_COST_URL.format(period=period)
+    response = requests.get(semo_url)
+
+    if response.status_code != 200:
+        return None
+
+    return response.text
+
+
+def parse_semo_schema(semo_xml: str):
+    """
+    Fetch semo data for a period.
+
+    Args:
+    - semo_xml (str): The xml to parse.
+
+    Returns:
+     A dictionary of attributes from the xml or None if there is an error parsing the xml.
+
+    """
+    try:
+        xml_root = ET.fromstring(semo_xml)
+        imbalance_xml = xml_root.find("PUB_30MinImbalCost")
+        xml_as_dict =  {"imbalance_volume": float(imbalance_xml.attrib.get('ImbalanceVolume')),
+                        "imbalance_price": float(imbalance_xml.attrib.get('ImbalancePrice')),
+                        "imbalance_cost": float(imbalance_xml.attrib.get('ImbalanceCost'))}
+    except:
+        return None
+    
+    return xml_as_dict
+    
 
 def extract_handler(event, context):
     get_latest_data_json_from_s3

@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY electricity_bidding_data/ ./electricity_bidding_data/
 COPY tests/ ./tests/
 
-CMD [ "pytest", "./tests"]
+CMD [ "python", "-m", "pytest", "-s", "tests/"]
