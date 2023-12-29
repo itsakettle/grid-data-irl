@@ -67,7 +67,7 @@ def fetch_semo_xml(period: str):
     return response.text
 
 
-def parse_semo_xml(semo_xml: str):
+def parse_semo_xml(period: str, semo_xml: str):
     """
     Fetch semo data for a period.
 
@@ -81,7 +81,8 @@ def parse_semo_xml(semo_xml: str):
     try:
         xml_root = ET.fromstring(semo_xml)
         imbalance_xml = xml_root.find("PUB_30MinImbalCost")
-        xml_as_dict =  {"imbalance_volume": float(imbalance_xml.attrib.get('ImbalanceVolume')),
+        xml_as_dict =  {"period": period,
+                        "imbalance_volume": float(imbalance_xml.attrib.get('ImbalanceVolume')),
                         "imbalance_price": float(imbalance_xml.attrib.get('ImbalancePrice')),
                         "imbalance_cost": float(imbalance_xml.attrib.get('ImbalanceCost'))}
     except:
@@ -94,11 +95,8 @@ def main(run_time: str, semo_df_path: str):
     Runs the main extract_semo job.
 
     Args:
-    - run_time (str): The run time of the job. This determines the period we fetch
-    - semo_df_path (str): THe location where the semo dataframe is saved.
-
-    Returns:
-     A dictionary of attributes from the xml or None if there is an error parsing the xml.
+    - run_time (str): The run time of the job which determines the period we fetch
+    - semo_df_path (str): The location where the semo dataframe is saved.
 
     """
 
