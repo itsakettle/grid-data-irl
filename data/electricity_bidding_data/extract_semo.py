@@ -102,10 +102,11 @@ def main(run_time: str, semo_df_path: str):
 
     period = period_to_fetch(run_time_iso=run_time)
     semo_xml = fetch_semo_xml(period=period)
-    period_semo_df = pl.DataFrame(semo_xml)
-    existing_semo_df = read_df(semo_df_path)
-    new_df = pl.concat([existing_semo_df, period_semo_df])
-    new_df.write_parquet(file=semo_df_path)
+    semo_data = parse_semo_xml(period=period, semo_xml=semo_xml)
+    new_df = pl.DataFrame(semo_data)
+    existing_semo_df = read_df(path=semo_df_path)
+    
+    if existing_semo_df is not None:
+        new_df = pl.concat([existing_semo_df, new_df])
 
-if __name__ == "__main__":
-    main()
+    new_df.write_parquet(file=semo_df_path)
