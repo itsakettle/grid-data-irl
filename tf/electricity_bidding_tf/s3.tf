@@ -57,5 +57,5 @@ resource "aws_s3_bucket_public_access_block" "public_access" {
 }
 
 locals {
-  lambda_s3_bucket_id = aws_s3_bucket.lambda_bucket.id
+  lambda_s3_bucket = {id=aws_s3_bucket.lambda_bucket.id, arn=aws_s3_bucket.lambda_bucket.arn}
 }
