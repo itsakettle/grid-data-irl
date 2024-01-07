@@ -1,28 +1,58 @@
 
-data "archive_file" "lambda_process_request" {
+resource "null_resource" "package_lambda" {
+
+  triggers = {
+    timestamp = timestamp()
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+     mkdir "./lambda_function/package"
+     pip install -r "${path.module}/../../../data/requirements.txt" -t "${path.module}/lambda_function/package"
+     cp -r "${path.module}/../../../data/electricity_bidding_data" "${path.module}/lambda_function/package"
+     EOT
+    interpreter = ["/bin/bash", "-c"]
+  }
+}
+
+data "archive_file" "lambda_function" {
+  depends_on  = [null_resource.package_lambda]
   type = "zip"
   source_dir  = "${path.module}/lambda_function/"
-  output_path = "${path.module}/lambda_function.zip"
+  output_path = "${path.module}/extract_semo_lambda_function.zip"
 }
 
 resource "aws_s3_object" "lambda_extract_semo" {
-  bucket = var.lambda_s3_bucket_id
-  key    = "lambda_function.zip"
-  source = data.archive_file.lambda_process_request.output_path
-  etag = filemd5(data.archive_file.lambda_process_request.output_path)
+  bucket = var.lambda_s3_bucket_info.id
+  key    = "extract_semo_lambda_function_${timestamp()}.zip"
+  source = data.archive_file.lambda_function.output_path
 }
+
+resource "null_resource" "package_lambda_clean" {
+
+  triggers = {
+    timestamp = timestamp()
+  }
+
+  depends_on  = [aws_s3_object.lambda_extract_semo]
+  provisioner "local-exec" {
+    command = "rm -rf ${path.module}/lambda_function/package"
+    interpreter = ["/bin/bash", "-c"]
+  }
+}
+
 
 # LAMBDA
 resource "aws_lambda_function" "lambda_function" {
   function_name = "${var.lambda_function_name}_${var.env}"
 
-  s3_bucket = var.lambda_s3_bucket.id
+  s3_bucket = var.lambda_s3_bucket_info.id
   s3_key    = aws_s3_object.lambda_extract_semo.key
 
   runtime = "python3.11"
   handler = "lambda_function.extract_semo.py"
 
-  source_code_hash = data.archive_file.lambda_process_request.output_base64sha256
+  source_code_hash = data.archive_file.lambda_function.output_base64sha256
 
   # Amazon Resource Number...uniquely identifies AWS resources.
   role = aws_iam_role.lambda_exec_and_s3.arn
@@ -80,13 +110,15 @@ resource "aws_iam_policy" "policy_s3" {
           "s3:DeleteObject"
         ]
         Effect   = "Allow"
-        Resource = var.lambda_s3_bucket.arn
+        Resource = var.lambda_s3_bucket_info.arn
       },
     ]
   })
 }
 
 resource "aws_iam_role_policy_attachment" "policy_attachment_s3" {
-  role       = aws_iam_role.policy_s3.name
+  role       = aws_iam_role.lambda_exec_and_s3.name
   policy_arn = aws_iam_policy.policy_s3.arn
 }
+
+

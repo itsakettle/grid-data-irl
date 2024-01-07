@@ -14,7 +14,7 @@ variable "lambda_function_name" {
   default = "electricity-bidding-extract-semo-lambda"
 }
 
-variable "lambda_s3_bucket" {
+variable "lambda_s3_bucket_info" {
   description = "lambda s3 bucket info"
   type = object({id=string, arn=string})
 }

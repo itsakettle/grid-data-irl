@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "private" {
-  bucket = "${var.private_s3_bucket_name}"
+  bucket = "${var.private_s3_bucket_name}-${var.env}"
  
   # Prevent accidental deletion of this S3 bucket 
   lifecycle {
@@ -7,14 +7,14 @@ resource "aws_s3_bucket" "private" {
   }
 }
 
-resource "aws_s3_bucket_versioning" "disabled" {
+resource "aws_s3_bucket_versioning" "private_bucket" {
   bucket = aws_s3_bucket.private.id
   versioning_configuration {
     status = "Disabled"
   }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "default" {
+resource "aws_s3_bucket_server_side_encryption_configuration" "private_bucket" {
   bucket = aws_s3_bucket.private.id
 
   rule {
@@ -24,7 +24,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "default" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "public_access" {
+resource "aws_s3_bucket_public_access_block" "private_bucket" {
   bucket                  = aws_s3_bucket.private.id
   block_public_acls       = true
   block_public_policy     = true
@@ -36,9 +36,13 @@ resource "aws_s3_bucket_public_access_block" "public_access" {
 resource "aws_s3_bucket" "lambda_bucket" {
   bucket = "${var.lambda_s3_bucket_name}-${var.env}"
   force_destroy = true
+
+    lifecycle {
+    prevent_destroy = true
+  }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "default" {
+resource "aws_s3_bucket_server_side_encryption_configuration" "lambda_bucket" {
   bucket = aws_s3_bucket.lambda_bucket.id
 
   rule {
@@ -48,8 +52,15 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "default" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "public_access" {
-  bucket                  = aws_s3_bucket.melostats_lambda_bucket.id
+resource "aws_s3_bucket_versioning" "lambda_bucket" {
+  bucket = aws_s3_bucket.private.id
+  versioning_configuration {
+    status = "Disabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "lambda_bucket" {
+  bucket                  = aws_s3_bucket.lambda_bucket.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -57,5 +68,8 @@ resource "aws_s3_bucket_public_access_block" "public_access" {
 }
 
 locals {
-  lambda_s3_bucket = {id=aws_s3_bucket.lambda_bucket.id, arn=aws_s3_bucket.lambda_bucket.arn}
+  lambda_s3_bucket_info = {
+    id = aws_s3_bucket.lambda_bucket.id
+    arn = aws_s3_bucket.lambda_bucket.arn
+    }
 }
