@@ -7,9 +7,10 @@ resource "null_resource" "package_lambda" {
 
   provisioner "local-exec" {
     command = <<-EOT
-     mkdir "./lambda_function/package"
-     pip install -r "${path.module}/../../../data/requirements.txt" -t "${path.module}/lambda_function/package"
-     cp -r "${path.module}/../../../data/electricity_bidding_data" "${path.module}/lambda_function/package"
+     mkdir "./lambda_function_package"
+     pip install -r "${path.module}/../../../data/requirements.txt" -t "${path.module}/lambda_function_package"
+     cp -r "${path.module}/../../../data/electricity_bidding_data" "${path.module}/lambda_function_package"
+     cp -r "${path.module}/lambda_function/lambda_function.py" "${path.module}/lambda_function_package"
      EOT
     interpreter = ["/bin/bash", "-c"]
   }
@@ -18,7 +19,7 @@ resource "null_resource" "package_lambda" {
 data "archive_file" "lambda_function" {
   depends_on  = [null_resource.package_lambda]
   type = "zip"
-  source_dir  = "${path.module}/lambda_function/"
+  source_dir  = "${path.module}/lambda_function_package/"
   output_path = "${path.module}/extract_semo_lambda_function.zip"
 }
 
@@ -36,7 +37,7 @@ resource "null_resource" "package_lambda_clean" {
 
   depends_on  = [aws_s3_object.lambda_extract_semo]
   provisioner "local-exec" {
-    command = "rm -rf ${path.module}/lambda_function/package"
+    command = "rm -rf ${path.module}/lambda_function_package"
     interpreter = ["/bin/bash", "-c"]
   }
 }
@@ -44,13 +45,13 @@ resource "null_resource" "package_lambda_clean" {
 
 # LAMBDA
 resource "aws_lambda_function" "lambda_function" {
-  function_name = "${var.lambda_function_name}_${var.env}"
+  function_name = "${var.lambda_function_name}-${var.env}"
 
   s3_bucket = var.lambda_s3_bucket_info.id
   s3_key    = aws_s3_object.lambda_extract_semo.key
 
   runtime = "python3.11"
-  handler = "lambda_function.extract_semo.py"
+  handler = "lambda_function.handler"
 
   source_code_hash = data.archive_file.lambda_function.output_base64sha256
 

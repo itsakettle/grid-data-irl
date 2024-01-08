@@ -92,7 +92,7 @@ def parse_semo_xml(period: str, semo_xml: str):
 
 def main(run_time: str, semo_df_path: str):
     """
-    Runs the main extract_semo job.
+    Runs the main extract_semo job. 
 
     Args:
     - run_time (str): The run time of the job which determines the period we fetch
