@@ -13,11 +13,11 @@ variable "aws_region" {
 variable "private_s3_bucket_name" {
   description = "Name of private s3 bucket."
   type = string
-  default = "itsakettle-electricity-bidding-private"
+  default = ""
 }
 
 variable "lambda_s3_bucket_name" {
   description = "lambda S3 bucket name."
   type = string
-  default = "itsakettle-electricity-bidding-lambda-bucket"
+  default = ""
 }

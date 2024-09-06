@@ -1,4 +1,4 @@
-# electricity_bidding
+# grid-data-irl
 
 `terraform plan`
 `terraform apply`
