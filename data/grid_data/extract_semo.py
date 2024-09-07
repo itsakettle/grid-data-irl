@@ -1,31 +1,11 @@
-import boto3
 import requests
 import xml.etree.ElementTree as ET
 from typing import Type, List
 from datetime import datetime, timezone
-from collections import namedtuple 
-
-import polars as pl
+import table_manager
 
 SEMO_MINIMAL_COST_URL = "https://reports.sem-o.com/documents/PUB_30MinImbalCost_{period}.xml"
 SEMO_PERIOD_FORMAT = "%Y%m%d%H%M"
-
-def read_df(path: str) -> Type[pl.DataFrame]:
-    """
-    Get's a dataframe, handling errors on the way
-
-    Args:
-    - path (str): Path to the df.
-
-    Returns:
-        A polars dataframe or None if it doesn't exist
-    """
-    try:
-        df = pl.read_parquet(path)
-    except FileNotFoundError:
-        df = None
-
-    return df
    
 def period_to_fetch(run_time_iso: str):
     """
@@ -82,15 +62,15 @@ def parse_semo_xml(period: str, semo_xml: str):
         xml_root = ET.fromstring(semo_xml)
         imbalance_xml = xml_root.find("PUB_30MinImbalCost")
         xml_as_dict =  {"period": period,
-                        "imbalance_volume": float(imbalance_xml.attrib.get('ImbalanceVolume')),
-                        "imbalance_price": float(imbalance_xml.attrib.get('ImbalancePrice')),
-                        "imbalance_cost": float(imbalance_xml.attrib.get('ImbalanceCost'))}
+                        "imbalance_volume": [float(imbalance_xml.attrib.get('ImbalanceVolume'))],
+                        "imbalance_price": [float(imbalance_xml.attrib.get('ImbalancePrice'))],
+                        "imbalance_cost": [float(imbalance_xml.attrib.get('ImbalanceCost'))]}
     except:
         raise Exception(f"Unable to parse Semo xml.")
     
     return xml_as_dict
 
-def main(run_time: str, semo_df_path: str):
+def main(run_time: str, semo_delta_path: str):
     """
     Runs the main extract_semo job. 
 
@@ -103,10 +83,6 @@ def main(run_time: str, semo_df_path: str):
     period = period_to_fetch(run_time_iso=run_time)
     semo_xml = fetch_semo_xml(period=period)
     semo_data = parse_semo_xml(period=period, semo_xml=semo_xml)
-    new_df = pl.DataFrame(semo_data)
-    existing_semo_df = read_df(path=semo_df_path)
-    
-    if existing_semo_df is not None:
-        new_df = pl.concat([existing_semo_df, new_df])
-
-    new_df.write_parquet(file=semo_df_path)
+    table_manager.append(row=semo_data, 
+                         to_delta_path=semo_delta_path, 
+                         schema=table_manager.tables["system_imbalance_price"])
