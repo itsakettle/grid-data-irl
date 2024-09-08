@@ -1,8 +1,7 @@
 import requests
 import xml.etree.ElementTree as ET
-from typing import Type, List
 from datetime import datetime, timezone
-import table_manager
+from grid_data.table_manager import Tables, TableManager
 
 SEMO_MINIMAL_COST_URL = "https://reports.sem-o.com/documents/PUB_30MinImbalCost_{period}.xml"
 SEMO_PERIOD_FORMAT = "%Y%m%d%H%M"
@@ -70,19 +69,17 @@ def parse_semo_xml(period: str, semo_xml: str):
     
     return xml_as_dict
 
-def main(run_time: str, semo_delta_path: str):
+def main(run_time: str, base_path: str):
     """
     Runs the main extract_semo job. 
 
     Args:
     - run_time (str): The run time of the job which determines the period we fetch
-    - semo_df_path (str): The location where the semo dataframe is saved.
+    - base_path (str): The location where the dataframe is saved.
 
     """
-
     period = period_to_fetch(run_time_iso=run_time)
     semo_xml = fetch_semo_xml(period=period)
     semo_data = parse_semo_xml(period=period, semo_xml=semo_xml)
-    table_manager.append(row=semo_data, 
-                         to_delta_path=semo_delta_path, 
-                         schema=table_manager.tables["system_imbalance_price"])
+    table_manager = TableManager(base_path=base_path)
+    table_manager.append(column_data=semo_data, to_table=Tables.IMBALANCE_PRICE)
