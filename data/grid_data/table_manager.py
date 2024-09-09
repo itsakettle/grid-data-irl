@@ -18,6 +18,14 @@ class TableManager:
         self.base_path = base_path
 
     def append(self, column_data: dict, to_table: Tables):
+        """
+        Append data to a table.
+
+        Args:
+        - column_data (dict): A dict of column values
+        - to_table (Tables): The table to append data to.
+
+        """
         table_info = to_table.value
         df = pl.DataFrame(data=column_data, schema=table_info.schema)
         path = Path(self.base_path) / table_info.name
