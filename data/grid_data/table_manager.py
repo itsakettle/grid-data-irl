@@ -8,9 +8,9 @@ TableInfo = namedtuple("TableInfo", ["name", "schema"])
 class Tables(Enum):
     IMBALANCE_PRICE = TableInfo(name="imbalance_price",
                                 schema={"period": pl.Utf8, 
-                                    "imbalance_volume": pl.Float32, 
-                                     "imbalance_price": pl.Float32,
-                                     "imbalance_cost": pl.Float32})
+                                    "imbalance_volume": pl.Float64, 
+                                     "imbalance_price": pl.Float64,
+                                     "imbalance_cost": pl.Float64})
 
 class TableManager:
 
